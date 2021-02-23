@@ -9,10 +9,10 @@ fn run_set(name: &str, setup: Setup) -> io::Result<()> {
     unsafe {
         sync();
     }
-    print!("{:>15}:", "iouring_tuned");
-    let filename = format!("../iouring_tuned_{}.text", name);
+    print!("{:>15}:", "std");
+    let filename = format!("../std_{}.text", name);
     let timer = Timer::start();
-    iouring_write_tuned(&filename, setup)?;
+    write_std(&filename, setup)?;
     let elapsed = timer.stop();
     println!("{} ms", elapsed.as_millis());
     remove_file(filename)?;
@@ -31,10 +31,10 @@ fn run_set(name: &str, setup: Setup) -> io::Result<()> {
     unsafe {
         sync();
     }
-    print!("{:>15}:", "std");
-    let filename = format!("../std_{}.text", name);
+    print!("{:>15}:", "iouring_tuned");
+    let filename = format!("../iouring_tuned_{}.text", name);
     let timer = Timer::start();
-    write_std(&filename, setup)?;
+    iouring_write_tuned(&filename, setup)?;
     let elapsed = timer.stop();
     println!("{} ms", elapsed.as_millis());
     remove_file(filename)?;
@@ -46,16 +46,16 @@ fn main() -> io::Result<()> {
     run_set(
         "default",
         Setup {
-            sync: false,
+            fsync: false,
             direct: false,
             fallocate: false,
         },
     )?;
 
     run_set(
-        "sync",
+        "fsync",
         Setup {
-            sync: true,
+            fsync: true,
             direct: false,
             fallocate: false,
         },
@@ -64,16 +64,25 @@ fn main() -> io::Result<()> {
     run_set(
         "direct",
         Setup {
-            sync: false,
+            fsync: false,
             direct: true,
             fallocate: false,
         },
     )?;
 
     run_set(
-        "sync_fallocate",
+        "fallocate",
         Setup {
-            sync: true,
+            fsync: false,
+            direct: false,
+            fallocate: true,
+        },
+    )?;
+
+    run_set(
+        "fsync_fallocate",
+        Setup {
+            fsync: true,
             direct: false,
             fallocate: true,
         },
@@ -82,7 +91,7 @@ fn main() -> io::Result<()> {
     run_set(
         "direct_fallocate",
         Setup {
-            sync: false,
+            fsync: false,
             direct: true,
             fallocate: true,
         },

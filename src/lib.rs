@@ -18,7 +18,7 @@ pub const TOTAL: usize = 5 * 1024 * 1024 * 1024;
 pub const DATA_LEN: usize = 512 * 1024;
 pub static DATA: [u8; DATA_LEN] = [0x61; DATA_LEN];
 const NPAGES: usize = TOTAL / DATA_LEN;
-pub const BATCH_SIZE: usize = 1024;
+pub const BATCH_SIZE: usize = 64;
 
 #[derive(Debug)]
 pub struct Timer(Instant);
@@ -36,7 +36,7 @@ impl Timer {
 
 #[derive(Default, Clone, Copy)]
 pub struct Setup {
-    pub sync: bool,
+    pub fsync: bool,
     pub direct: bool,
     pub fallocate: bool,
 }
@@ -61,7 +61,7 @@ pub fn iouring_write(path: impl AsRef<Path>, setup: Setup) -> io::Result<()> {
 
     if setup.fallocate {
         unsafe {
-            let entry = Fallocate::new(Fd(file.as_raw_fd()), (NPAGES * DATA_LEN) as i64).build();
+            let entry = Fallocate::new(Fd(file.as_raw_fd()), TOTAL as i64).build();
             sq.available()
                 .push(entry)
                 .map_err(|_| io::Error::new(io::ErrorKind::Other, "failed to push entry to sq"))?;
@@ -90,7 +90,7 @@ pub fn iouring_write(path: impl AsRef<Path>, setup: Setup) -> io::Result<()> {
         }
     }
 
-    if setup.sync {
+    if setup.fsync {
         unsafe {
             let entry = Fsync::new(Fd(file.as_raw_fd())).build();
             sq.available()
@@ -149,7 +149,7 @@ pub fn iouring_write_tuned(path: impl AsRef<Path>, setup: Setup) -> io::Result<(
 
     if setup.fallocate {
         unsafe {
-            let entry = Fallocate::new(Fd(file.as_raw_fd()), (NPAGES * DATA_LEN) as i64).build();
+            let entry = Fallocate::new(Fd(file.as_raw_fd()), TOTAL as i64).build();
             sq.available()
                 .push(entry)
                 .map_err(|_| io::Error::new(io::ErrorKind::Other, "failed to push entry to sq"))?;
@@ -179,7 +179,7 @@ pub fn iouring_write_tuned(path: impl AsRef<Path>, setup: Setup) -> io::Result<(
         }
     }
 
-    if setup.sync {
+    if setup.fsync {
         unsafe {
             let entry = Fsync::new(Fd(file.as_raw_fd())).build();
             sq.available()
@@ -203,14 +203,14 @@ pub fn write_std(path: impl AsRef<Path>, setup: Setup) -> io::Result<()> {
     let mut file = open_file(path, &setup)?;
 
     if setup.fallocate {
-        file.set_len((NPAGES * DATA_LEN) as u64)?;
+        file.set_len(TOTAL as u64)?;
     }
 
     for _ in 0..NPAGES {
         file.write_all(&DATA)?;
     }
 
-    if setup.sync {
+    if setup.fsync {
         file.sync_all()?;
     }
 
