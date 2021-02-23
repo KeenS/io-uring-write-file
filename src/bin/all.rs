@@ -1,24 +1,44 @@
 use io_uring_write_file::{iouring_write, iouring_write_tuned, write_std, Setup, Timer};
+use libc::sync;
+use std::fs::remove_file;
 use std::io;
 
 fn run_set(name: &str, setup: Setup) -> io::Result<()> {
-    println!("std {}", name);
-    let timer = Timer::start();
-    write_std(format!("../std_{}.text", name), setup)?;
-    let elapsed = timer.stop();
-    println!("{} ms", elapsed.as_millis());
+    println!("{}", name);
 
-    println!("iouring {}", name);
+    unsafe {
+        sync();
+    }
+    print!("{:>15}:", "iouring_tuned");
+    let filename = format!("../iouring_tuned_{}.text", name);
     let timer = Timer::start();
-    iouring_write(format!("../iouring_{}.text", name), setup)?;
+    iouring_write_tuned(&filename, setup)?;
     let elapsed = timer.stop();
     println!("{} ms", elapsed.as_millis());
+    remove_file(filename)?;
 
-    println!("iouring_tuned_{}", name);
+    unsafe {
+        sync();
+    }
+    print!("{:>15}:", "iouring");
+    let filename = format!("../iouring_{}.text", name);
     let timer = Timer::start();
-    iouring_write_tuned(format!("../iouring_tuned_{}.text", name), setup)?;
+    iouring_write(&filename, setup)?;
     let elapsed = timer.stop();
     println!("{} ms", elapsed.as_millis());
+    remove_file(filename)?;
+
+    unsafe {
+        sync();
+    }
+    print!("{:>15}:", "std");
+    let filename = format!("../std_{}.text", name);
+    let timer = Timer::start();
+    write_std(&filename, setup)?;
+    let elapsed = timer.stop();
+    println!("{} ms", elapsed.as_millis());
+    remove_file(filename)?;
+
     Ok(())
 }
 
@@ -28,6 +48,7 @@ fn main() -> io::Result<()> {
         Setup {
             sync: false,
             direct: false,
+            fallocate: false,
         },
     )?;
 
@@ -36,6 +57,7 @@ fn main() -> io::Result<()> {
         Setup {
             sync: true,
             direct: false,
+            fallocate: false,
         },
     )?;
 
@@ -44,6 +66,25 @@ fn main() -> io::Result<()> {
         Setup {
             sync: false,
             direct: true,
+            fallocate: false,
+        },
+    )?;
+
+    run_set(
+        "sync_fallocate",
+        Setup {
+            sync: true,
+            direct: false,
+            fallocate: true,
+        },
+    )?;
+
+    run_set(
+        "direct_fallocate",
+        Setup {
+            sync: false,
+            direct: true,
+            fallocate: true,
         },
     )?;
 
